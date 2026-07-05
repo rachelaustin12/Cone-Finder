@@ -104,7 +104,9 @@ export default function VanMap({ vans, className = "" }) {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setUserPos([pos.coords.latitude, pos.coords.longitude]);
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          if (!isNaN(lat) && !isNaN(lng)) setUserPos([lat, lng]);
           setLocating(false);
         },
         () => setLocating(false),
