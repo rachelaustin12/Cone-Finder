@@ -124,10 +124,10 @@ export default function Find() {
           <h1 className="text-[hsl(var(--color-sky))] text-lg font-semibold flex-1">Find Vans</h1>
           <button
             onClick={toggleAlerts}
-            title={alertsEnabled ? 'Disable nearby alerts' : 'Enable nearby alerts'}
-            className={`min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl border transition-colors ${alertsEnabled ? 'bg-yellow-100 border-yellow-300 text-yellow-700' : 'bg-muted border-border text-muted-foreground'}`}
+            className={`min-h-[36px] flex items-center justify-center gap-1.5 rounded-xl border px-2.5 transition-colors text-xs font-semibold ${alertsEnabled ? 'bg-yellow-100 border-yellow-300 text-yellow-700' : 'bg-muted border-border text-muted-foreground'}`}
           >
             {alertsEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+            <span className="hidden sm:inline">{alertsEnabled ? 'Alerts on' : 'Get alerts'}</span>
           </button>
           <Button
             size="sm"
