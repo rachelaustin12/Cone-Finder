@@ -22,23 +22,42 @@ export default function DriverLocationToggle({ van, onUpdate }) {
       return;
     }
 
-    watchRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const data = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          is_active: true,
-          last_location_update: new Date().toISOString(),
-        };
-        await base44.entities.IceCreamVan.update(van.id, data);
-        onUpdate({ ...van, ...data });
-      },
+    // First get a single position to confirm permission is granted
+    navigator.geolocation.getCurrentPosition(
       () => {
-        toast.error("Could not get your location. Please enable location services.");
+        // Permission granted — now start watching
+        watchRef.current = navigator.geolocation.watchPosition(
+          async (pos) => {
+            const data = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              is_active: true,
+              last_location_update: new Date().toISOString(),
+            };
+            try {
+              await base44.entities.IceCreamVan.update(van.id, data);
+              onUpdate({ ...van, ...data });
+            } catch (e) {
+              toast.error("Failed to update location. Check your connection.");
+            }
+          },
+          (err) => {
+            toast.error("Lost location access. Please check your settings.");
+            setOptimisticActive(false);
+            onUpdate({ ...van, is_active: false });
+          },
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+        );
+      },
+      (err) => {
+        const msg = err.code === 1
+          ? "Location permission denied. Please enable it in your browser/device settings."
+          : "Could not get your location. Please try again.";
+        toast.error(msg);
         setOptimisticActive(false);
         onUpdate({ ...van, is_active: false });
       },
-      { enableHighAccuracy: true, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   };
 

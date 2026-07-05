@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { IceCream, Loader2, Plus, Star, ArrowLeft } from 'lucide-react';
+import { IceCream, Loader2, Plus, Star, ArrowLeft, Bell, BellOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,12 +9,14 @@ import VanMap from '../components/VanMap';
 import VanCard from '../components/VanCard';
 import ReportSightingModal from '../components/ReportSightingModal';
 import AddReviewModal from '../components/AddReviewModal';
+import { useProximityAlerts } from '../hooks/useProximityAlerts';
 
 export default function Find() {
   const navigate = useNavigate();
   const [userPos, setUserPos] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [alertsEnabled, setAlertsEnabled] = useState(() => localStorage.getItem('cone_finder_alerts') === 'true');
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [pullDelta, setPullDelta] = useState(0);
@@ -102,6 +104,14 @@ export default function Find() {
     }
   }, []);
 
+  useProximityAlerts(alertsEnabled ? vans : [], userPos);
+
+  const toggleAlerts = () => {
+    const next = !alertsEnabled;
+    setAlertsEnabled(next);
+    localStorage.setItem('cone_finder_alerts', String(next));
+  };
+
   return (
     <div ref={mainRef} className="min-h-screen overflow-y-auto bg-background font-nunito">
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -112,12 +122,17 @@ export default function Find() {
           </button>
           <span className="text-xl">🗺️</span>
           <h1 className="text-[hsl(var(--color-sky))] text-lg font-semibold flex-1">Find Vans</h1>
+          <button
+            onClick={toggleAlerts}
+            title={alertsEnabled ? 'Disable nearby alerts' : 'Enable nearby alerts'}
+            className={`min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl border transition-colors ${alertsEnabled ? 'bg-yellow-100 border-yellow-300 text-yellow-700' : 'bg-muted border-border text-muted-foreground'}`}
+          >
+            {alertsEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+          </button>
           <Button
             size="sm"
             variant="outline"
             onClick={() => setShowReviewModal(true)} className="bg-[#f094b1] text-[hsl(var(--secondary))] px-3 text-lg font-thin rounded-xl inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground h-8 gap-1.5">
-            
-            
             <Star className="w-4 h-4" />
             Review
           </Button>

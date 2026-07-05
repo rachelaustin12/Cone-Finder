@@ -3,6 +3,19 @@ import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-l
 import L from 'leaflet';
 import VanMarkerPopup from './VanMarkerPopup';
 
+// Flies to user position once it's available
+function FlyToUser({ userPos }) {
+  const map = useMap();
+  const hasFlown = useRef(false);
+  useEffect(() => {
+    if (userPos && !hasFlown.current) {
+      hasFlown.current = true;
+      map.flyTo(userPos, 14, { duration: 1.2 });
+    }
+  }, [userPos, map]);
+  return null;
+}
+
 const vanIcon = new L.DivIcon({
   html: `<div style="font-size:32px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.2));">🍦</div>`,
   iconSize: [40, 40],
@@ -84,14 +97,21 @@ function MyLocationButton({ userPos, onLocated }) {
 
 export default function VanMap({ vans, className = "" }) {
   const [userPos, setUserPos] = useState(null);
+  const [locating, setLocating] = useState(true);
   const defaultCenter = [51.505, -0.09];
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => setUserPos([pos.coords.latitude, pos.coords.longitude]),
-        () => {}
+        (pos) => {
+          setUserPos([pos.coords.latitude, pos.coords.longitude]);
+          setLocating(false);
+        },
+        () => setLocating(false),
+        { enableHighAccuracy: true, timeout: 10000 }
       );
+    } else {
+      setLocating(false);
     }
   }, []);
 
@@ -99,7 +119,7 @@ export default function VanMap({ vans, className = "" }) {
 
   return (
     <div className="bg-slate-50 mb-6 rounded-2xl overflow-hidden shadow-lg border border-border h-[50vh]">
-      <MapContainer center={center} zoom={13} className="w-full h-full" style={{ minHeight: '400px' }}>
+      <MapContainer center={center} zoom={userPos ? 14 : 5} className="w-full h-full" style={{ minHeight: '400px' }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -107,6 +127,7 @@ export default function VanMap({ vans, className = "" }) {
           maxZoom={20} />
         
 
+        <FlyToUser userPos={userPos} />
         <MyLocationButton userPos={userPos} onLocated={setUserPos} />
         {userPos && <Marker position={userPos} icon={userIcon} />}
         {vans.filter((v) => v.is_active && v.latitude && v.longitude && !isNaN(v.latitude) && !isNaN(v.longitude)).map((van) =>
