@@ -8,7 +8,7 @@ function FlyToUser({ userPos }) {
   const map = useMap();
   const hasFlown = useRef(false);
   useEffect(() => {
-    if (userPos && !hasFlown.current) {
+    if (userPos && !hasFlown.current && !isNaN(userPos[0]) && !isNaN(userPos[1])) {
       hasFlown.current = true;
       map.flyTo(userPos, 14, { duration: 1.2 });
     }
