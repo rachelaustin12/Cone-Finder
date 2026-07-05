@@ -75,7 +75,9 @@ export default function PrivacyPolicy() {
 
           <h3 className="text-lg font-semibold mt-6 mb-2">9. Contact Us</h3>
           <p className="text-sm text-foreground leading-relaxed mb-4">
-            If you have questions about this Privacy Policy, please contact us through the app or email us with your concerns.
+            If you have questions about this Privacy Policy, please visit our app at{' '}
+            <a href="https://conefinder.base44.app" target="_blank" rel="noopener noreferrer" className="text-sky-500 underline underline-offset-2">conefinder.base44.app</a>
+            {' '}or contact us through the app.
           </p>
 
           <div className="mt-12 pt-6 border-t border-border/50">

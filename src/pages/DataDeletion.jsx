@@ -77,7 +77,11 @@ export default function DataDeletion() {
         </section>
 
         <p className="text-xs text-muted-foreground text-center pb-4">
-          Questions? Email us at{' '}
+          Visit us at{' '}
+          <a href="https://conefinder.base44.app" target="_blank" rel="noopener noreferrer" className="text-sky-500 underline underline-offset-2">
+            conefinder.base44.app
+          </a>
+          {' '}· Questions? Email{' '}
           <a href="mailto:anxiousoakley@gmail.com" className="text-sky-500 underline underline-offset-2">
             anxiousoakley@gmail.com
           </a>
