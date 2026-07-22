@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { IceCream, Clock, Navigation, Eye, MessageCircle } from 'lucide-react';
+import { IceCream, Clock, Navigation, Eye, MessageCircle, Star } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import MessageVanModal from './MessageVanModal';
+import VanReviews from './VanReviews';
 
 function getDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -16,6 +17,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
 export default function VanCard({ van, userPosition }) {
   const [showMessage, setShowMessage] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
   const lastUpdate = van.last_location_update ?
   formatDistanceToNow(new Date(van.last_location_update), { addSuffix: true }) :
   null;
@@ -101,9 +103,34 @@ export default function VanCard({ van, userPosition }) {
                       Message me
                     </button>
                   }
+                  {!van.isSighting &&
+                  <button
+                    onClick={() => setShowReviews((s) => !s)}
+                    className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-yellow-400/10 text-yellow-600 hover:bg-yellow-400/20 transition-colors flex items-center gap-1"
+                  >
+                    <Star className="w-3.5 h-3.5" />
+                    Reviews
+                  </button>
+                  }
                 </div>
               </div>
             </div>
+
+            <AnimatePresence>
+              {showReviews && !van.isSighting && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-3 pt-3 border-t border-border/60">
+                    <VanReviews vanId={van.id} />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </CardContent>
       </Card>

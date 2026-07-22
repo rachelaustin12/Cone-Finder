@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { IceCream, Loader2, Plus, Star, ArrowLeft, Bell, BellOff } from 'lucide-react';
+import { IceCream, Loader2, Plus, Star, ArrowLeft, Bell, BellOff, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ export default function Find() {
   const [showModal, setShowModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(() => localStorage.getItem('cone_finder_alerts') === 'true');
+  const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [pullDelta, setPullDelta] = useState(0);
@@ -94,6 +95,15 @@ export default function Find() {
   }));
 
   const allVans = [...vans, ...sightingVans];
+
+  const filteredVans = searchQuery.trim()
+    ? allVans.filter((v) => {
+        const q = searchQuery.toLowerCase();
+        return (v.name || '').toLowerCase().includes(q) ||
+               (v.specialties || '').toLowerCase().includes(q) ||
+               (v.driver_name || '').toLowerCase().includes(q);
+      })
+    : allVans;
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -175,28 +185,41 @@ export default function Find() {
           </h2>
         </div>
 
+        <div className="relative mb-4">
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by van name, specialty, or driver..."
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+
         {isLoading ?
         <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div> :
-        allVans.length === 0 ?
+        filteredVans.length === 0 ?
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="text-center py-16 px-4">
           
-            <div className="text-5xl mb-4">🍨</div>
-            <h3 className="font-pacifico text-xl mb-1">No vans spotted yet</h3>
+            <div className="text-5xl mb-4">{searchQuery.trim() ? '🔍' : '🍨'}</div>
+            <h3 className="font-pacifico text-xl mb-1">{searchQuery.trim() ? 'No matches found' : 'No vans spotted yet'}</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              Be the first to report a sighting!
+              {searchQuery.trim() ? 'Try a different search term.' : 'Be the first to report a sighting!'}
             </p>
+            {!searchQuery.trim() &&
             <Button onClick={() => setShowModal(true)} className="rounded-xl bg-accent hover:bg-accent/90 text-accent-foreground">
               📍 I found a van!
             </Button>
+            }
           </motion.div> :
 
         <div className="grid gap-3 sm:grid-cols-2">
-            {allVans.map((van) =>
+            {filteredVans.map((van) =>
           <VanCard key={van.id} van={van} userPosition={userPos} />
           )}
           </div>
@@ -212,7 +235,7 @@ export default function Find() {
       <AddReviewModal
         open={showReviewModal}
         onClose={() => setShowReviewModal(false)}
-        onReviewed={() => {}} />
+        onReviewed={() => queryClient.invalidateQueries({ queryKey: ['van-reviews'] })} />
       
     </div>);
 
