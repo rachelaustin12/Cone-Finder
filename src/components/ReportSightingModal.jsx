@@ -95,7 +95,6 @@ export default function ReportSightingModal({ open, onClose, vans, onReported })
         });
         vanId = newVan.id;
         vanName = newVan.name;
-        onReported(); // refresh van list so the new van shows up
       }
 
       // 2. Get the most accurate location available (retry + fallback built in)

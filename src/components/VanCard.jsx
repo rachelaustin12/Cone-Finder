@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { IceCream, Clock, Navigation, Eye, MessageCircle, Star } from 'lucide-react';
+import { IceCream, Clock, Navigation, Eye, MessageCircle, Star, Trash2, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import MessageVanModal from './MessageVanModal';
@@ -15,9 +15,11 @@ function getDistance(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export default function VanCard({ van, userPosition }) {
+export default function VanCard({ van, userPosition, currentUserId, onDeleteSighting, deletingId }) {
   const [showMessage, setShowMessage] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
+  const isOwnSighting = van.isSighting && van.sighting_id && currentUserId && van.created_by_id === currentUserId;
+  const isDeleting = deletingId === van.sighting_id;
   const lastUpdate = van.last_location_update ?
   formatDistanceToNow(new Date(van.last_location_update), { addSuffix: true }) :
   null;
@@ -110,6 +112,17 @@ export default function VanCard({ van, userPosition }) {
                   >
                     <Star className="w-3.5 h-3.5" />
                     Reviews
+                  </button>
+                  }
+                  {isOwnSighting &&
+                  <button
+                    onClick={() => onDeleteSighting(van.sighting_id)}
+                    disabled={isDeleting}
+                    title="Delete this sighting"
+                    className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 disabled:opacity-50 transition-colors flex items-center gap-1"
+                  >
+                    {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    Delete
                   </button>
                   }
                 </div>

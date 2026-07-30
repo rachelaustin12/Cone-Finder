@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { IceCream, Loader2, Plus, Star, ArrowLeft, Bell, BellOff, Search } from 'lucide-react';
+import { IceCream, Loader2, Plus, Star, ArrowLeft, Bell, BellOff, Search, Trash2, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,14 +10,19 @@ import VanCard from '../components/VanCard';
 import ReportSightingModal from '../components/ReportSightingModal';
 import AddReviewModal from '../components/AddReviewModal';
 import { useProximityAlerts } from '../hooks/useProximityAlerts';
+import { useAuth } from '@/lib/AuthContext';
+import { toast } from 'sonner';
 
 export default function Find() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [userPos, setUserPos] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(() => localStorage.getItem('cone_finder_alerts') === 'true');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showLast24h, setShowLast24h] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const [pullDelta, setPullDelta] = useState(0);
@@ -72,18 +77,43 @@ export default function Find() {
   const { data: sightings = [] } = useQuery({
     queryKey: ['van-sightings'],
     queryFn: async () => {
-      const all = await base44.entities.VanSighting.list('-created_date', 100);
-      const now = new Date();
-      return all.filter((s) => !s.expires_at || new Date(s.expires_at) > now);
+      const all = await base44.entities.VanSighting.list('-created_date', 200);
+      return all; // window filter applied below based on toggle
     },
     refetchInterval: 30000
   });
 
+  // Filter sightings by either "not expired" (default) or "within the last 24 hours" (toggle)
+  const visibleSightings = React.useMemo(() => {
+    const now = new Date();
+    if (showLast24h) {
+      const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      return sightings.filter((s) => new Date(s.created_date) >= cutoff);
+    }
+    return sightings.filter((s) => !s.expires_at || new Date(s.expires_at) > now);
+  }, [sightings, showLast24h]);
+
+  const handleDeleteSighting = async (sightingId) => {
+    if (!sightingId) return;
+    setDeletingId(sightingId);
+    try {
+      await base44.entities.VanSighting.delete(sightingId);
+      toast.success('Sighting removed');
+      await queryClient.invalidateQueries({ queryKey: ['van-sightings'] });
+    } catch (e) {
+      toast.error('Could not delete this sighting — you can only remove your own.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // Merge sightings as pseudo-vans for the map (vans not already sharing live location)
-  const sightingVans = sightings.
+  const sightingVans = visibleSightings.
   filter((s) => !vans.find((v) => v.id === s.van_id)).
   map((s) => ({
     id: `sighting-${s.id}`,
+    sighting_id: s.id,
+    created_by_id: s.created_by_id,
     name: s.van_name,
     latitude: s.latitude,
     longitude: s.longitude,
@@ -146,6 +176,13 @@ export default function Find() {
             <Star className="w-4 h-4" />
             Review
           </Button>
+          <button
+            onClick={() => setShowLast24h((v) => !v)}
+            className={`min-h-[36px] flex items-center justify-center gap-1.5 rounded-xl border px-2.5 transition-colors text-xs font-semibold ${showLast24h ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-muted border-border text-muted-foreground'}`}
+          >
+            <Clock className="w-4 h-4" />
+            <span className="hidden sm:inline">Last 24h</span>
+          </button>
           <Button
             size="sm"
             onClick={() => setShowModal(true)} className="bg-[#1499d2] text-[hsl(var(--background))] px-3 text-base font-thin rounded-xl inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 shadow h-8 gap-1.5 hover:bg-accent/90">
@@ -220,7 +257,14 @@ export default function Find() {
 
         <div className="grid gap-3 sm:grid-cols-2">
             {filteredVans.map((van) =>
-          <VanCard key={van.id} van={van} userPosition={userPos} />
+          <VanCard
+            key={van.id}
+            van={van}
+            userPosition={userPos}
+            currentUserId={user?.id}
+            onDeleteSighting={handleDeleteSighting}
+            deletingId={deletingId}
+          />
           )}
           </div>
         }
