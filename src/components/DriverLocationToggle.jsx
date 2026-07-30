@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { MapPin } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { getCurrentLocation } from '@/lib/geolocation';
 
 export default function DriverLocationToggle({ van, onUpdate }) {
   const watchRef = useRef(null);
@@ -15,50 +16,52 @@ export default function DriverLocationToggle({ van, onUpdate }) {
     setOptimisticActive(van.is_active);
   }, [van.is_active]);
 
-  const startSharing = () => {
+  const startSharing = async () => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser");
       setOptimisticActive(false);
       return;
     }
 
-    // First get a single position to confirm permission is granted
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        // Permission granted — now start watching
-        watchRef.current = navigator.geolocation.watchPosition(
-          async (pos) => {
-            const data = {
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              is_active: true,
-              last_location_update: new Date().toISOString(),
-            };
-            try {
-              await base44.entities.IceCreamVan.update(van.id, data);
-              onUpdate({ ...van, ...data });
-            } catch (e) {
-              toast.error("Failed to update location. Check your connection.");
-            }
-          },
-          (err) => {
-            toast.error("Lost location access. Please check your settings.");
-            setOptimisticActive(false);
-            onUpdate({ ...van, is_active: false });
-          },
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-        );
-      },
-      (err) => {
-        const msg = err.code === 1
-          ? "Location permission denied. Please enable it in your browser/device settings."
-          : "Could not get your location. Please try again.";
-        toast.error(msg);
-        setOptimisticActive(false);
-        onUpdate({ ...van, is_active: false });
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
+    try {
+      // Confirm permission with an accurate single read before watching
+      await getCurrentLocation();
+
+      // Permission granted — now start watching for live updates
+      watchRef.current = navigator.geolocation.watchPosition(
+        async (pos) => {
+          // Guard against NaN values that break the map
+          if (isNaN(pos.coords.latitude) || isNaN(pos.coords.longitude)) return;
+          const data = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            is_active: true,
+            last_location_update: new Date().toISOString(),
+          };
+          try {
+            await base44.entities.IceCreamVan.update(van.id, data);
+            onUpdate({ ...van, ...data });
+          } catch (e) {
+            toast.error("Failed to update location. Check your connection.");
+          }
+        },
+        (err) => {
+          toast.error(err.code === 1
+            ? "Lost location permission. Please re-enable it in your settings."
+            : "Lost location signal — check your GPS or move to an open area.");
+          setOptimisticActive(false);
+          onUpdate({ ...van, is_active: false });
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+      );
+    } catch (err) {
+      const msg = err.code === 1
+        ? "Location permission denied. Please enable it in your browser/device settings."
+        : "Could not get your location. Please try again in a location with better signal.";
+      toast.error(msg);
+      setOptimisticActive(false);
+      onUpdate({ ...van, is_active: false });
+    }
   };
 
   const stopSharing = async () => {

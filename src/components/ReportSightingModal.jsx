@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { Loader2, ChevronDown, Plus } from 'lucide-react';
+import { getCurrentLocation } from '@/lib/geolocation';
 
 function VanPicker({ vans, selectedVanId, onSelect, onAddNew }) {
   const [open, setOpen] = useState(false);
@@ -74,64 +75,70 @@ export default function ReportSightingModal({ open, onClose, vans, onReported })
     setReporterName('');
   };
 
-  const handleReport = () => {
+  const handleReport = async () => {
     if (!isAddingNew && !selectedVanId) { toast.error('Please select a van'); return; }
     if (isAddingNew && !newVanName.trim()) { toast.error('Please enter the van name'); return; }
     if (!navigator.geolocation) { toast.error('Geolocation not supported on this device'); return; }
 
     setLoading(true);
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const endOfDay = new Date();
-          endOfDay.setHours(23, 59, 59, 999);
+    try {
+      // 1. Create the van FIRST (decoupled from location so it works even if GPS is slow)
+      let vanId = selectedVanId;
+      let vanName = vans.find((v) => v.id === selectedVanId)?.name;
 
-          let vanId = selectedVanId;
-          let vanName = vans.find((v) => v.id === selectedVanId)?.name;
+      if (isAddingNew) {
+        const newVan = await base44.entities.IceCreamVan.create({
+          name: newVanName.trim(),
+          driver_email: 'unknown@unknown.com',
+          is_active: false,
+        });
+        vanId = newVan.id;
+        vanName = newVan.name;
+        onReported(); // refresh van list so the new van shows up
+      }
 
-          if (isAddingNew) {
-            const newVan = await base44.entities.IceCreamVan.create({
-              name: newVanName.trim(),
-              driver_email: 'unknown@unknown.com',
-              is_active: false,
-            });
-            vanId = newVan.id;
-            vanName = newVan.name;
-          }
-
-          await base44.entities.VanSighting.create({
-            van_id: vanId,
-            van_name: vanName,
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            reporter_name: reporterName.trim() || null,
-            note: note.trim() || null,
-            expires_at: endOfDay.toISOString()
-          });
-
-          setLoading(false);
-          toast.success("Sighting reported! Thanks for helping others find ice cream 🍦");
-          reset();
-          onClose();
-          onReported();
-        } catch (e) {
-          setLoading(false);
-          toast.error('Something went wrong — please try again.');
-        }
-      },
-      (err) => {
+      // 2. Get the most accurate location available (retry + fallback built in)
+      let coords;
+      try {
+        coords = await getCurrentLocation();
+      } catch (locErr) {
         setLoading(false);
-        if (err.code === 1) {
-          toast.error('Location access denied. Please allow location access in your browser settings and try again.');
-        } else if (err.code === 2) {
-          toast.error('Location unavailable. Please check your device\'s location settings.');
+        if (locErr.code === 1) {
+          toast.error('Location access denied. The van was added, but please allow location access in your browser settings to pin it on the map.');
+        } else if (locErr.code === 2) {
+          toast.error("Location unavailable. The van was added, but we couldn't pinpoint it. Check your device's location settings.");
         } else {
-          toast.error('Could not get your location — try again or move to an area with better signal.');
+          toast.error("Location timed out. The van was added — try reporting the sighting again from an area with better signal.");
         }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+        reset();
+        onClose();
+        return;
+      }
+
+      // 3. Create the sighting with the resolved coordinates
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      await base44.entities.VanSighting.create({
+        van_id: vanId,
+        van_name: vanName,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        reporter_name: reporterName.trim() || null,
+        note: note.trim() || null,
+        expires_at: endOfDay.toISOString()
+      });
+
+      setLoading(false);
+      toast.success("Sighting reported! Thanks for helping others find ice cream 🍦");
+      reset();
+      onClose();
+      onReported();
+    } catch (e) {
+      setLoading(false);
+      toast.error('Something went wrong — please try again.');
+    }
   };
 
   const vanSelector = (
